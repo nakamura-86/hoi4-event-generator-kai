@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoI4 News Generator - Ironclad Layout</title>
+    <title>HoI4 News Generator - Frame Masking</title>
     <style>
         :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
@@ -10,11 +10,11 @@
         h1 { color: var(--gold); font-size: 20px; text-align: center; margin: 0 0 20px; text-transform: uppercase; letter-spacing: 2px; }
         .group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: bold; color: var(--gold); }
-        input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-        textarea { height: 120px; resize: none; line-height: 1.5; font-family: serif; }
+        input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; box-sizing: border-box; }
+        textarea { height: 120px; resize: none; font-family: serif; font-size: 16px; }
         .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; }
         input[type="range"] { flex: 1; accent-color: var(--gold); }
-        button#saveBtn { width: 100%; padding: 15px; background: #45a049; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button#saveBtn { width: 100%; padding: 15px; background: #45a049; color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button#saveBtn:hover { background: #52be57; }
         .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; box-shadow: 0 0 50px #000; }
         canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
@@ -31,15 +31,15 @@
         </div>
         <div class="group">
             <label>2. EVENT TITLE</label>
-            <input type="text" id="ttl" placeholder="Title here">
+            <input type="text" id="ttl" placeholder="The Rhineland Remilitarized">
         </div>
         <div class="group">
             <label>3. DESCRIPTION CONTENT</label>
-            <textarea id="txt" placeholder="Description here..."></textarea>
+            <textarea id="txt" placeholder="German troops have entered the Rhineland..."></textarea>
         </div>
         <div class="group">
             <label>4. OPTION LABEL</label>
-            <input type="text" id="btn" placeholder="Button text">
+            <input type="text" id="btn" placeholder="This is German territory.">
         </div>
         <button id="saveBtn">EXPORT AS PNG</button>
     </div>
@@ -51,10 +51,11 @@
 <script>
     const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
     const bg = new Image(), photo = new Image();
-    let pos = {x: 485, y: 280}, photoScale = 0.85, drag = false, start = {x: 0, y: 0};
+    let pos = {x: 485, y: 280}, drag = false, start = {x: 0, y: 0};
 
     // 1. 背景画像を読み込み
     bg.src = "template.png"; 
+
     bg.onload = () => { 
         cv.width = bg.width; 
         cv.height = bg.height; 
@@ -75,83 +76,71 @@
 
     function render() {
         if (!bg.complete) return;
-        
         ctx.clearRect(0, 0, cv.width, cv.height);
 
-        // 背景全体を白で初期化 (新聞の外側を白くするため)
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, cv.width, cv.height);
+        const scale = parseFloat(document.getElementById('zoom').value);
 
-        // 最新のズーム値を取得
-        photoScale = parseFloat(document.getElementById('zoom').value);
-
-        // --- STEP 1: 写真を一番下に描画 ---
+        // --- STEP 1: 写真を最背面に描画（まずは普通に描く） ---
         if (photo.src && photo.complete) {
-            const pw = photo.width * photoScale, ph = photo.height * photoScale;
+            const pw = photo.width * scale, ph = photo.height * scale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
-            // 写真がない時は穴を暗くしておく
             ctx.fillStyle = "#111";
             ctx.fillRect(107, 141, 755, 272);
         }
 
-        // --- STEP 2: 背景（新聞枠）を上に重ねる ---
+        // --- STEP 2: 新聞背景を重ねる ---
         ctx.drawImage(bg, 0, 0);
 
-        // --- STEP 3: 【解決策】新聞の外側を太い白枠で覆い隠す ---
-        // 新聞の絵に被らないギリギリのラインで、はみ出た写真を消します
+        // --- STEP 3: 【重要】新聞の外側を白で塗りつぶして隠す ---
+        // 新聞のギザギザの外側に写真がはみ出さないよう、四辺に白い「目隠し」を置く
         ctx.fillStyle = "white";
-        const offset = 12; // 新聞の端から内側への距離（太すぎず細すぎない絶妙なライン）
-        ctx.fillRect(0, 0, offset, cv.height); // 左壁
-        ctx.fillRect(cv.width - offset, 0, offset, cv.height); // 右壁
-        ctx.fillRect(0, 0, cv.width, offset); // 上壁
-        ctx.fillRect(0, cv.height - offset, cv.width, offset); // 下壁
+        // 左側隠し
+        ctx.fillRect(0, 0, 20, cv.height);
+        // 右側隠し
+        ctx.fillRect(cv.width - 20, 0, 20, cv.height);
+        // 上側隠し
+        ctx.fillRect(0, 0, cv.width, 20);
+        // 下側隠し
+        ctx.fillRect(0, cv.height - 20, cv.width, 20);
 
-        // --- STEP 4: 文字を描画 (確定座標) ---
-        ctx.fillStyle = "#2c2c2c";
+        // --- STEP 4: 文字描画（指定の数値に固定） ---
         
-        // タイトル: y=280 / 21px
-        ctx.textAlign = "center"; 
+        // タイトル: y=280
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#2c2c2c";
         ctx.font = "bold 21px serif";
         ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 280);
 
-        // 本文: x=50, y=305 / 13px / maxWidth 440 / lineHeight 15
-        ctx.textAlign = "left"; 
+        // 本文: x=50, y=305, maxWidth=440, lineHeight=15, 13px
+        ctx.textAlign = "left";
         ctx.font = "13px serif";
         wrapText(document.getElementById('txt').value || "Description text here...", 50, 305, 440, 15);
 
-        // ボタン: y=535 / 19px / 白文字
-        ctx.textAlign = "center"; 
+        // ボタン: y=535, 19px, 白文字
+        ctx.textAlign = "center";
         ctx.font = "bold 19px serif";
         ctx.fillStyle = "white";
         ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 535);
     }
 
     function wrapText(text, x, y, maxWidth, lineHeight) {
-        text.split('\n').forEach(paragraph => {
+        text.split('\n').forEach(p => {
             let line = '';
-            const characters = paragraph.split('');
-            for (let n = 0; n < characters.length; n++) {
-                let testLine = line + characters[n];
-                if (ctx.measureText(testLine).width > maxWidth) {
+            const chars = p.split('');
+            for(let i=0; i<chars.length; i++) {
+                let test = line + chars[i];
+                if (ctx.measureText(test).width > maxWidth) {
                     ctx.fillText(line, x, y);
-                    line = characters[n];
-                    y += lineHeight;
-                } else {
-                    line = testLine;
-                }
+                    line = chars[i]; y += lineHeight;
+                } else { line = test; }
             }
-            ctx.fillText(line, x, y);
-            y += lineHeight;
+            ctx.fillText(line, x, y); y += lineHeight;
         });
     }
 
-    // 全入力同期
-    ['ttl','txt','btn','zoom'].forEach(id => {
-        document.getElementById(id).oninput = render;
-    });
+    ['ttl','txt','btn','zoom'].forEach(id => document.getElementById(id).oninput = render);
 
-    // 写真のドラッグ操作
     cv.onmousedown = e => {
         drag = true; 
         const r = cv.getBoundingClientRect(), s = cv.width/r.width;
