@@ -2,22 +2,17 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HOI4 ニュースジェネレーター - 実機準拠版</title>
+    <title>HOI4 ニュース生成 - 最終完成版</title>
     <style>
-        :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
+        :root { --gold: #d4af37; --bg: #000; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "MS PMincho", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
-        
         .controls { width: 340px; background: var(--panel); padding: 20px; border-radius: 12px; height: fit-content; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333; }
         input, textarea { background: #111; color: white; border: 1px solid #444; padding: 10px; width: 100%; box-sizing: border-box; border-radius: 4px; font-size: 14px; margin-bottom: 5px; }
-        textarea { height: 140px; resize: none; line-height: 1.5; }
-        canvas { background: #222; cursor: move; box-shadow: 0 0 40px #000; max-height: 90vh; }
-        
+        textarea { height: 160px; resize: none; line-height: 1.4; font-family: serif; }
+        canvas { background: #000; cursor: move; box-shadow: 0 0 40px #000; max-height: 90vh; }
         button { background: #28a745; color: white; padding: 14px; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; width: 100%; font-size: 16px; margin-top: 10px; }
         button:hover { background: #218838; }
-        
         label { font-size: 12px; font-weight: bold; color: var(--gold); display: block; margin-top: 10px; margin-bottom: 5px; text-transform: uppercase; }
-        .hint { font-size: 11px; color: #888; text-align: center; margin-top: 10px; font-style: italic; }
-        
         .setup-box { background: #333; padding: 12px; border: 2px dashed var(--gold); border-radius: 8px; margin-bottom: 15px; }
     </style>
 </head>
@@ -26,7 +21,6 @@
     <div class="controls">
         <h2 style="margin:0 0 15px; font-size: 20px; color: var(--gold); text-align: center;">HOI4 NEWS GEN</h2>
 
-        <!-- 背景未登録時のみ表示 -->
         <div id="setupArea" class="setup-box">
             <label style="color:var(--gold);">【必須】背景(template.png)を登録</label>
             <input type="file" id="bgUpload" accept="image/*">
@@ -37,7 +31,7 @@
             <input type="file" id="imgUpload" accept="image/*">
             <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
                 <span style="font-size:11px; color:#aaa;">ズーム</span>
-                <input type="range" id="zoomRange" min="0.01" max="3" step="0.01" value="0.8">
+                <input type="range" id="zoomRange" min="0.05" max="4" step="0.01" value="0.8">
             </div>
         </div>
         
@@ -52,12 +46,12 @@
         </div>
         
         <div>
-            <label>4. ボタンテキスト</label>
+            <label>4. オプションラベル</label>
             <input type="text" id="btnInput" placeholder="ここはドイツの領土だ">
         </div>
         
-        <button onclick="download()">PNG形式で保存</button>
-        <div class="hint">ドラッグ：移動 / ホイール：拡大縮小</div>
+        <button onclick="download()">PNGでエクスポート</button>
+        <p style="font-size:11px; color:#777; text-align:center; margin-top:10px;">ドラッグで移動 / スライダーで拡大</p>
     </div>
 
     <div class="viewport">
@@ -70,43 +64,34 @@
     const bg = new Image();
     const photo = new Image();
     
-    // 位置・ズーム管理
     let state = { x: 480, y: 280, s: 0.8, isDrag: false, sx: 0, sy: 0 };
 
-    // --- 背景の自動読み込み (LocalStorage) ---
+    // --- 背景の自動記憶 ---
     window.onload = () => {
-        const savedBG = localStorage.getItem('hoi4_bg_memory_v4');
+        const savedBG = localStorage.getItem('hoi4_bg_final');
         if (savedBG) {
             bg.src = savedBG;
-            bg.onload = () => { setupCanvas(); draw(); };
+            bg.onload = () => { canvas.width = bg.width; canvas.height = bg.height; draw(); };
             document.getElementById('setupArea').style.display = 'none';
         }
     };
 
-    function setupCanvas() {
-        canvas.width = bg.width;
-        canvas.height = bg.height;
-    }
-
-    // 背景の新規登録
     document.getElementById('bgUpload').onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (f) => {
-            localStorage.setItem('hoi4_bg_memory_v4', f.target.result);
+            localStorage.setItem('hoi4_bg_final', f.target.result);
             bg.src = f.target.result;
-            bg.onload = () => { setupCanvas(); draw(); document.getElementById('setupArea').style.display = 'none'; };
+            bg.onload = () => { canvas.width = bg.width; canvas.height = bg.height; draw(); document.getElementById('setupArea').style.display = 'none'; };
         };
         reader.readAsDataURL(e.target.files[0]);
     };
 
-    // 写真の読み込み
     document.getElementById('imgUpload').onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (f) => { photo.src = f.target.result; photo.onload = draw; };
         reader.readAsDataURL(e.target.files[0]);
     };
 
-    // 入力反映
     document.querySelectorAll('input, textarea').forEach(el => el.oninput = draw);
 
     // --- 操作ロジック ---
@@ -127,48 +112,50 @@
             draw();
         }
     };
-    // スライダーとホイール両方でズーム可能に
     document.getElementById('zoomRange').oninput = (e) => {
         state.s = parseFloat(e.target.value);
         draw();
-    };
-    canvas.onwheel = (e) => { 
-        e.preventDefault(); 
-        state.s += e.deltaY > 0 ? -0.02 : 0.02; 
-        state.s = Math.max(0.01, state.s); 
-        document.getElementById('zoomRange').value = state.s;
-        draw(); 
     };
 
     function draw() {
         if (!bg.src) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 1. 【背面】写真
+        // --- STEP 1: はみ出し防止のクリッピング ---
+        ctx.save();
+        ctx.beginPath();
+        // キャンバス（新聞画像）の範囲内のみを描写対象にする
+        ctx.rect(0, 0, canvas.width, canvas.height);
+        ctx.clip();
+
+        // 写真の描画
         if(photo.src) {
+            const pw = photo.width * state.s, ph = photo.height * scale; // scale -> state.s
+            // state.s で正しく拡大縮小
             ctx.drawImage(photo, state.x - (photo.width * state.s)/2, state.y - (photo.height * state.s)/2, photo.width * state.s, photo.height * state.s);
         }
+        ctx.restore(); // クリッピング解除
 
-        // 2. 【前面】新聞枠 (透明な穴から写真が見える)
+        // --- STEP 2: 新聞枠を重ねる ---
         ctx.drawImage(bg, 0, 0);
 
-        // 3. 【最前面】文字 (HoI4実機に合わせた高めの座標)
+        // --- STEP 3: 文字描画 (大幅に引き上げ) ---
         ctx.fillStyle = "#2c2c2c";
         
-        // タイトル
+        // タイトル: 写真枠(下端y=413付近)のすぐ下 y=435 に配置
         ctx.textAlign = "center";
-        ctx.font = "bold 32px 'MS PMincho', serif";
-        ctx.fillText(document.getElementById('titleInput').value || "EVENT TITLE", canvas.width / 2, 440);
+        ctx.font = "bold 32px serif";
+        ctx.fillText(document.getElementById('titleInput').value || "EVENT TITLE", canvas.width / 2, 435);
 
-        // 本文 (日本語1文字ずつ判定)
+        // 本文: タイトルのすぐ下 y=470 から開始
         ctx.textAlign = "left";
-        ctx.font = "20px 'MS PMincho', serif";
-        wrapText(document.getElementById('bodyInput').value || "Description here...", 115, 480, 740, 26);
+        ctx.font = "20px serif";
+        wrapText(document.getElementById('bodyInput').value || "Description here...", 115, 470, 740, 26);
 
-        // ボタン
+        // ボタン: 中央 y=888 (プレート内)
         ctx.textAlign = "center";
         ctx.font = "bold 23px sans-serif";
-        ctx.fillText(document.getElementById('btnInput').value || "Option Button", canvas.width / 2, 885);
+        ctx.fillText(document.getElementById('btnInput').value || "Option Button", canvas.width / 2, 888);
     }
 
     function wrapText(txt, x, y, maxWidth, lineHeight) {
