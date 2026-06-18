@@ -2,182 +2,171 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HOI4 ニュース生成 - 最終完成版</title>
+    <title>HOI4 News Event Generator</title>
     <style>
-        :root { --gold: #d4af37; --bg: #000; --panel: #1e1e1e; }
-        body { background: var(--bg); color: #eee; font-family: "MS PMincho", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
-        .controls { width: 340px; background: var(--panel); padding: 20px; border-radius: 12px; height: fit-content; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333; }
-        input, textarea { background: #111; color: white; border: 1px solid #444; padding: 10px; width: 100%; box-sizing: border-box; border-radius: 4px; font-size: 14px; margin-bottom: 5px; }
-        textarea { height: 160px; resize: none; line-height: 1.4; font-family: serif; }
-        canvas { background: #000; cursor: move; box-shadow: 0 0 40px #000; max-height: 90vh; }
-        button { background: #28a745; color: white; padding: 14px; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; width: 100%; font-size: 16px; margin-top: 10px; }
-        button:hover { background: #218838; }
-        label { font-size: 12px; font-weight: bold; color: var(--gold); display: block; margin-top: 10px; margin-bottom: 5px; text-transform: uppercase; }
-        .setup-box { background: #333; padding: 12px; border: 2px dashed var(--gold); border-radius: 8px; margin-bottom: 15px; }
+        :root { --gold: #d4af37; --bg: #121212; --panel: #252525; }
+        body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
+        .sidebar { width: 360px; background: var(--panel); padding: 25px; border-radius: 12px; border: 1px solid #333; height: fit-content; box-shadow: 0 10px 30px #000; }
+        h1 { color: var(--gold); font-size: 22px; text-align: center; margin: 0 0 20px; text-transform: uppercase; letter-spacing: 2px; }
+        .group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: bold; color: var(--gold); }
+        input[type="text"], textarea, input[type="file"] { width: 100%; background: #151515; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        textarea { height: 150px; resize: none; line-height: 1.6; }
+        .slider-box { display: flex; align-items: center; gap: 15px; margin-top: 10px; font-size: 13px; }
+        input[type="range"] { flex: 1; accent-color: var(--gold); }
+        button#saveBtn { width: 100%; padding: 18px; background: #45a049; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button#saveBtn:hover { background: #52be57; transform: translateY(-2px); }
+        .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; box-shadow: 0 0 50px #000; }
+        canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
+        .hint { font-size: 11px; color: #777; text-align: center; margin-top: 15px; font-style: italic; }
     </style>
 </head>
 <body>
 
-    <div class="controls">
-        <h2 style="margin:0 0 15px; font-size: 20px; color: var(--gold); text-align: center;">HOI4 NEWS GEN</h2>
-
-        <div id="setupArea" class="setup-box">
-            <label style="color:var(--gold);">【必須】背景(template.png)を登録</label>
-            <input type="file" id="bgUpload" accept="image/*">
+    <div class="sidebar">
+        <h1>HOI4 EVENT GEN</h1>
+        <div class="group">
+            <label>1. NEWS PHOTO</label>
+            <input type="file" id="photoIn" accept="image/*">
+            <div class="slider-box"><span>ZOOM</span><input type="range" id="zoom" min="0.1" max="4" step="0.01" value="0.85"></div>
         </div>
-
-        <div>
-            <label>1. イベント写真を選択</label>
-            <input type="file" id="imgUpload" accept="image/*">
-            <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                <span style="font-size:11px; color:#aaa;">ズーム</span>
-                <input type="range" id="zoomRange" min="0.05" max="4" step="0.01" value="0.8">
-            </div>
+        <div class="group">
+            <label>2. EVENT TITLE</label>
+            <input type="text" id="ttl" placeholder="The Rhineland Remilitarized">
         </div>
-        
-        <div>
-            <label>2. タイトル</label>
-            <input type="text" id="titleInput" placeholder="ラインラント進駐">
+        <div class="group">
+            <label>3. DESCRIPTION</label>
+            <textarea id="txt" placeholder="Enter the news report here..."></textarea>
         </div>
-        
-        <div>
-            <label>3. 本文</label>
-            <textarea id="bodyInput" placeholder="ドイツ軍が国境を越えて..."></textarea>
+        <div class="group">
+            <label>4. OPTION LABEL</label>
+            <input type="text" id="btn" placeholder="This is German territory.">
         </div>
-        
-        <div>
-            <label>4. オプションラベル</label>
-            <input type="text" id="btnInput" placeholder="ここはドイツの領土だ">
-        </div>
-        
-        <button onclick="download()">PNGでエクスポート</button>
-        <p style="font-size:11px; color:#777; text-align:center; margin-top:10px;">ドラッグで移動 / スライダーで拡大</p>
+        <button id="saveBtn">EXPORT AS PNG</button>
+        <p class="hint">Drag the photo in the preview to move it.</p>
     </div>
 
     <div class="viewport">
-        <canvas id="canvas"></canvas>
+        <canvas id="cv"></canvas>
     </div>
 
 <script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const bg = new Image();
-    const photo = new Image();
+    const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+    const bg = new Image(), photo = new Image();
     
-    let state = { x: 480, y: 280, s: 0.8, isDrag: false, sx: 0, sy: 0 };
+    // 状態管理
+    let pos = {x: 485, y: 275}, drag = false, start = {x: 0, y: 0};
 
-    // --- 背景の自動記憶 ---
-    window.onload = () => {
-        const savedBG = localStorage.getItem('hoi4_bg_final');
-        if (savedBG) {
-            bg.src = savedBG;
-            bg.onload = () => { canvas.width = bg.width; canvas.height = bg.height; draw(); };
-            document.getElementById('setupArea').style.display = 'none';
-        }
+    // 背景画像のURL (自動読み込み)
+    bg.crossOrigin = "anonymous";
+    bg.src = "https://quintessential-plum-egyp9oir.edgeone.dev/newspaper_transparent.png";
+
+    bg.onload = () => {
+        cv.width = bg.width;
+        cv.height = bg.height;
+        render();
     };
 
-    document.getElementById('bgUpload').onchange = (e) => {
+    // 写真の読み込み
+    document.getElementById('photoIn').onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
         const reader = new FileReader();
         reader.onload = (f) => {
-            localStorage.setItem('hoi4_bg_final', f.target.result);
-            bg.src = f.target.result;
-            bg.onload = () => { canvas.width = bg.width; canvas.height = bg.height; draw(); document.getElementById('setupArea').style.display = 'none'; };
+            photo.src = f.target.result;
+            photo.onload = render;
         };
-        reader.readAsDataURL(e.target.files[0]);
+        reader.readAsDataURL(file);
     };
 
-    document.getElementById('imgUpload').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (f) => { photo.src = f.target.result; photo.onload = draw; };
-        reader.readAsDataURL(e.target.files[0]);
-    };
+    function render() {
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        
+        // 拡大率を取得
+        const scale = parseFloat(document.getElementById('zoom').value);
 
-    document.querySelectorAll('input, textarea').forEach(el => el.oninput = draw);
-
-    // --- 操作ロジック ---
-    canvas.onmousedown = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const scale = canvas.width / rect.width;
-        state.isDrag = true;
-        state.sx = (e.clientX - rect.left) * scale - state.x;
-        state.sy = (e.clientY - rect.top) * scale - state.y;
-    };
-    window.onmouseup = () => state.isDrag = false;
-    window.onmousemove = (e) => {
-        if(state.isDrag) {
-            const rect = canvas.getBoundingClientRect();
-            const scale = canvas.width / rect.width;
-            state.x = (e.clientX - rect.left) * scale - state.sx;
-            state.y = (e.clientY - rect.top) * scale - state.sy;
-            draw();
-        }
-    };
-    document.getElementById('zoomRange').oninput = (e) => {
-        state.s = parseFloat(e.target.value);
-        draw();
-    };
-
-    function draw() {
-        if (!bg.src) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // --- STEP 1: はみ出し防止のクリッピング ---
+        // --- STEP 1: 写真を一番下に描画 (はみ出し防止クリップ付き) ---
         ctx.save();
         ctx.beginPath();
-        // キャンバス（新聞画像）の範囲内のみを描写対象にする
-        ctx.rect(0, 0, canvas.width, canvas.height);
+        ctx.rect(0, 0, cv.width, cv.height); // 新聞のキャンバスサイズで切り抜き
         ctx.clip();
-
-        // 写真の描画
-        if(photo.src) {
-            const pw = photo.width * state.s, ph = photo.height * scale; // scale -> state.s
-            // state.s で正しく拡大縮小
-            ctx.drawImage(photo, state.x - (photo.width * state.s)/2, state.y - (photo.height * state.s)/2, photo.width * state.s, photo.height * state.s);
+        
+        if (photo.src && photo.complete) {
+            const pw = photo.width * scale, ph = photo.height * scale;
+            ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
+        } else {
+            ctx.fillStyle = "#111";
+            ctx.fillRect(107, 141, 755, 272);
         }
-        ctx.restore(); // クリッピング解除
+        ctx.restore();
 
-        // --- STEP 2: 新聞枠を重ねる ---
-        ctx.drawImage(bg, 0, 0);
+        // --- STEP 2: 新聞テンプレートを上に重ねる ---
+        if (bg.complete) {
+            ctx.drawImage(bg, 0, 0);
+        }
 
-        // --- STEP 3: 文字描画 (大幅に引き上げ) ---
+        // --- STEP 3: 文字描画 (位置を大幅に上に修正) ---
         ctx.fillStyle = "#2c2c2c";
         
-        // タイトル: 写真枠(下端y=413付近)のすぐ下 y=435 に配置
+        // タイトル: y=380 (写真のすぐ下)
         ctx.textAlign = "center";
-        ctx.font = "bold 32px serif";
-        ctx.fillText(document.getElementById('titleInput').value || "EVENT TITLE", canvas.width / 2, 435);
+        ctx.font = "bold 34px serif";
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 380);
 
-        // 本文: タイトルのすぐ下 y=470 から開始
+        // 本文: y=425 から開始
         ctx.textAlign = "left";
         ctx.font = "20px serif";
-        wrapText(document.getElementById('bodyInput').value || "Description here...", 115, 470, 740, 26);
+        wrapText(document.getElementById('txt').value || "Description here...", 115, 425, 740, 26);
 
-        // ボタン: 中央 y=888 (プレート内)
+        // ボタン: y=885
         ctx.textAlign = "center";
-        ctx.font = "bold 23px sans-serif";
-        ctx.fillText(document.getElementById('btnInput').value || "Option Button", canvas.width / 2, 888);
+        ctx.font = "bold 23px serif";
+        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 885);
     }
 
-    function wrapText(txt, x, y, maxWidth, lineHeight) {
-        const paragraphs = txt.split('\n');
-        let currentY = y;
-        paragraphs.forEach(p => {
+    function wrapText(text, x, y, maxWidth, lineHeight) {
+        text.split('\n').forEach(p => {
             let line = '';
-            for(let char of p) {
-                if(ctx.measureText(line + char).width > maxWidth) {
-                    ctx.fillText(line, x, currentY);
-                    line = char; currentY += lineHeight;
-                } else { line += char; }
+            const chars = p.split('');
+            for(let i=0; i<chars.length; i++) {
+                let test = line + chars[i];
+                if (ctx.measureText(test).width > maxWidth) {
+                    ctx.fillText(line, x, y);
+                    line = chars[i]; y += lineHeight;
+                } else { line = test; }
             }
-            ctx.fillText(line, x, currentY);
-            currentY += lineHeight;
+            ctx.fillText(line, x, y); y += lineHeight;
         });
     }
 
-    function download() {
-        const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png'); a.download = 'hoi4_news.png'; a.click();
-    }
+    // リアルタイム反映
+    ['ttl','txt','btn','zoom'].forEach(id => {
+        document.getElementById(id).oninput = render;
+    });
+
+    // マウスドラッグ
+    cv.onmousedown = e => {
+        drag = true;
+        const r = cv.getBoundingClientRect(), s = cv.width/r.width;
+        start = {x: (e.clientX - r.left)*s, y: (e.clientY - r.top)*s};
+    };
+    window.onmousemove = e => {
+        if(!drag) return;
+        const r = cv.getBoundingClientRect(), s = cv.width/r.width;
+        const mx = (e.clientX - r.left)*s, my = (e.clientY - r.top)*s;
+        pos.x += mx - start.x; pos.y += my - start.y;
+        start = {x: mx, y: my}; render();
+    };
+    window.onmouseup = () => drag = false;
+
+    // 保存
+    document.getElementById('saveBtn').onclick = () => {
+        const link = document.createElement('a');
+        link.download = 'hoi4_news.png';
+        link.href = cv.toDataURL("image/png");
+        link.click();
+    };
 </script>
+
 </body>
 </html>
