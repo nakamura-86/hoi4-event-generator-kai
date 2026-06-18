@@ -2,21 +2,21 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HOI4 News Event Generator</title>
+    <title>HOI4 News Generator</title>
     <style>
-        :root { --gold: #d4af37; --bg: #121212; --panel: #252525; }
+        :root { --gold: #d4af37; --bg: #000; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
         .sidebar { width: 360px; background: var(--panel); padding: 25px; border-radius: 12px; border: 1px solid #333; height: fit-content; box-shadow: 0 10px 30px #000; }
-        h1 { color: var(--gold); font-size: 22px; text-align: center; margin: 0 0 20px; text-transform: uppercase; letter-spacing: 2px; }
+        h1 { color: var(--gold); font-size: 22px; text-align: center; margin: 0 0 20px; letter-spacing: 2px; }
         .group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: bold; color: var(--gold); }
-        input[type="text"], textarea, input[type="file"] { width: 100%; background: #151515; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
-        textarea { height: 150px; resize: none; line-height: 1.6; }
+        input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        textarea { height: 160px; resize: none; line-height: 1.5; }
         .slider-box { display: flex; align-items: center; gap: 15px; margin-top: 10px; font-size: 13px; }
         input[type="range"] { flex: 1; accent-color: var(--gold); }
         button#saveBtn { width: 100%; padding: 18px; background: #45a049; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button#saveBtn:hover { background: #52be57; transform: translateY(-2px); }
-        .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; box-shadow: 0 0 50px #000; }
+        .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; }
         canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
         .hint { font-size: 11px; color: #777; text-align: center; margin-top: 15px; font-style: italic; }
     </style>
@@ -26,24 +26,24 @@
     <div class="sidebar">
         <h1>HOI4 EVENT GEN</h1>
         <div class="group">
-            <label>1. NEWS PHOTO</label>
+            <label>1. イベント写真を選択</label>
             <input type="file" id="photoIn" accept="image/*">
-            <div class="slider-box"><span>ZOOM</span><input type="range" id="zoom" min="0.1" max="4" step="0.01" value="0.85"></div>
+            <div class="slider-box"><span>ズーム</span><input type="range" id="zoom" min="0.1" max="4" step="0.01" value="0.85"></div>
         </div>
         <div class="group">
-            <label>2. EVENT TITLE</label>
-            <input type="text" id="ttl" placeholder="The Rhineland Remilitarized">
+            <label>2. タイトル</label>
+            <input type="text" id="ttl" placeholder="ラインラント進駐">
         </div>
         <div class="group">
-            <label>3. DESCRIPTION</label>
-            <textarea id="txt" placeholder="Enter the news report here..."></textarea>
+            <label>3. 本文</label>
+            <textarea id="txt" placeholder="説明文を入力..."></textarea>
         </div>
         <div class="group">
-            <label>4. OPTION LABEL</label>
-            <input type="text" id="btn" placeholder="This is German territory.">
+            <label>4. オプションラベル</label>
+            <input type="text" id="btn" placeholder="ここはドイツの領土だ">
         </div>
-        <button id="saveBtn">EXPORT AS PNG</button>
-        <p class="hint">Drag the photo in the preview to move it.</p>
+        <button id="saveBtn">PNG形式でエクスポート</button>
+        <p class="hint">プレビュー画面で写真をドラッグして移動してください。</p>
     </div>
 
     <div class="viewport">
@@ -54,20 +54,18 @@
     const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
     const bg = new Image(), photo = new Image();
     
-    // 状態管理
-    let pos = {x: 485, y: 275}, drag = false, start = {x: 0, y: 0};
+    let pos = {x: 480, y: 280}, drag = false, start = {x: 0, y: 0};
 
-    // 背景画像のURL (自動読み込み)
-    bg.crossOrigin = "anonymous";
-    bg.src = "https://quintessential-plum-egyp9oir.edgeone.dev/newspaper_transparent.png";
+    // --- 背景画像(template.png)を同じリポジトリから読み込む ---
+    // これにより外部URLに頼らず100%表示されます
+    bg.src = "template.png"; 
 
     bg.onload = () => {
-        cv.width = bg.width;
-        cv.height = bg.height;
+        cv.width = bg.width; // 961
+        cv.height = bg.height; // 1102
         render();
     };
 
-    // 写真の読み込み
     document.getElementById('photoIn').onchange = (e) => {
         const file = e.target.files[0];
         if(!file) return;
@@ -80,17 +78,19 @@
     };
 
     function render() {
-        ctx.clearRect(0, 0, cv.width, cv.height);
+        if (!bg.complete) return;
         
-        // 拡大率を取得
+        ctx.clearRect(0, 0, cv.width, cv.height);
         const scale = parseFloat(document.getElementById('zoom').value);
 
-        // --- STEP 1: 写真を一番下に描画 (はみ出し防止クリップ付き) ---
+        // --- STEP 1: はみ出し防止（クリッピング） ---
+        // 新聞のキャンバスサイズ内のみを描画対象にする
         ctx.save();
         ctx.beginPath();
-        ctx.rect(0, 0, cv.width, cv.height); // 新聞のキャンバスサイズで切り抜き
+        ctx.rect(0, 0, cv.width, cv.height);
         ctx.clip();
         
+        // 写真を背景よりも下（背面）に描画
         if (photo.src && photo.complete) {
             const pw = photo.width * scale, ph = photo.height * scale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
@@ -100,28 +100,26 @@
         }
         ctx.restore();
 
-        // --- STEP 2: 新聞テンプレートを上に重ねる ---
-        if (bg.complete) {
-            ctx.drawImage(bg, 0, 0);
-        }
+        // --- STEP 2: 背景（新聞枠）を上に重ねる ---
+        ctx.drawImage(bg, 0, 0);
 
-        // --- STEP 3: 文字描画 (位置を大幅に上に修正) ---
+        // --- STEP 3: 文字描画（位置を数百単位で大幅に上に修正） ---
         ctx.fillStyle = "#2c2c2c";
         
-        // タイトル: y=380 (写真のすぐ下)
+        // タイトル: 450から大幅にアップ -> y=435
         ctx.textAlign = "center";
-        ctx.font = "bold 34px serif";
-        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 380);
+        ctx.font = "bold 32px serif";
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 435);
 
-        // 本文: y=425 から開始
+        // 本文: 510から大幅にアップ -> y=475
         ctx.textAlign = "left";
         ctx.font = "20px serif";
-        wrapText(document.getElementById('txt').value || "Description here...", 115, 425, 740, 26);
+        wrapText(document.getElementById('txt').value || "Description text here...", 115, 475, 740, 26);
 
-        // ボタン: y=885
+        // ボタン: y=888
         ctx.textAlign = "center";
         ctx.font = "bold 23px serif";
-        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 885);
+        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 888);
     }
 
     function wrapText(text, x, y, maxWidth, lineHeight) {
@@ -139,12 +137,10 @@
         });
     }
 
-    // リアルタイム反映
     ['ttl','txt','btn','zoom'].forEach(id => {
         document.getElementById(id).oninput = render;
     });
 
-    // マウスドラッグ
     cv.onmousedown = e => {
         drag = true;
         const r = cv.getBoundingClientRect(), s = cv.width/r.width;
@@ -159,7 +155,6 @@
     };
     window.onmouseup = () => drag = false;
 
-    // 保存
     document.getElementById('saveBtn').onclick = () => {
         const link = document.createElement('a');
         link.download = 'hoi4_news.png';
@@ -167,6 +162,5 @@
         link.click();
     };
 </script>
-
 </body>
 </html>
