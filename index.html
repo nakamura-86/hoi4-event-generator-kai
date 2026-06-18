@@ -108,20 +108,20 @@
         // --- STEP 3: 文字描画（大幅に上に移動） ---
         ctx.fillStyle = "#2c2c2c";
         
-        // タイトル: y=430（実機の位置に準拠）
+        // タイトル: y=（実機の位置に準拠）
         ctx.textAlign = "center";
         ctx.font = "bold 32px serif";
-        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 430);
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 730);
 
-        // 本文: y=475 から開始
+        // 本文: y= から開始
         ctx.textAlign = "left";
         ctx.font = "20px serif";
-        wrapText(document.getElementById('txt').value || "Description text here...", 115, 475, 740, 26);
+        wrapText(document.getElementById('txt').value || "Description text here...", 115, 775, 740, 26);
 
         // ボタン: y=885（プレート中央）
         ctx.textAlign = "center";
         ctx.font = "bold 23px serif";
-        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 885);
+        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 485);
     }
 
     // 日本語対応の自動改行関数
