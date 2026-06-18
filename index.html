@@ -2,21 +2,21 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoI4 News Generator - Ultra Stable</title>
+    <title>HoI4 News Generator - Final Fixed</title>
     <style>
-        :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
+        :root { --gold: #d4af37; --bg: #000; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
         .sidebar { width: 360px; background: var(--panel); padding: 25px; border-radius: 12px; border: 1px solid #333; height: fit-content; box-shadow: 0 10px 30px #000; }
-        h1 { color: var(--gold); font-size: 20px; text-align: center; margin: 0 0 20px; text-transform: uppercase; letter-spacing: 2px; }
+        h1 { color: var(--gold); font-size: 20px; text-align: center; margin: 0 0 20px; text-transform: uppercase; }
         .group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: bold; color: var(--gold); }
         input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; box-sizing: border-box; }
-        textarea { height: 120px; resize: none; font-family: serif; font-size: 16px; }
+        textarea { height: 120px; resize: none; font-size: 14px; }
         .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; }
         input[type="range"] { flex: 1; accent-color: var(--gold); }
         button#saveBtn { width: 100%; padding: 15px; background: #45a049; color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button#saveBtn:hover { background: #52be57; }
-        .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; box-shadow: 0 0 50px #000; }
+        .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; }
         canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
     </style>
 </head>
@@ -31,21 +31,21 @@
         </div>
         <div class="group">
             <label>2. EVENT TITLE</label>
-            <input type="text" id="ttl" placeholder="The Rhineland Remilitarized">
+            <input type="text" id="ttl" placeholder="Title here">
         </div>
         <div class="group">
             <label>3. DESCRIPTION CONTENT</label>
-            <textarea id="txt" placeholder="German troops have entered the Rhineland..."></textarea>
+            <textarea id="txt" placeholder="Description here"></textarea>
         </div>
         <div class="group">
             <label>4. OPTION LABEL</label>
-            <input type="text" id="btn" placeholder="This is German territory.">
+            <input type="text" id="btn" placeholder="Button text">
         </div>
         <button id="saveBtn">EXPORT AS PNG</button>
     </div>
 
     <div class="viewport">
-        <canvas id="cv" width="961" height="1102"></canvas>
+        <canvas id="cv"></canvas>
     </div>
 
 <script>
@@ -53,93 +53,87 @@
     const bg = new Image(), photo = new Image();
     let pos = {x: 485, y: 280}, drag = false, start = {x: 0, y: 0};
 
-    // 背景画像の読み込み (URLを2段階で設定して確実に表示させる)
-    bg.crossOrigin = "anonymous";
-    bg.src = "template.png"; // まずはローカルを探す
-    
-    // 画像が読み込めなかった時のための予備URL
-    bg.onerror = () => {
-        if(bg.src.indexOf('edgeone.dev') === -1) {
-            bg.src = "https://quintessential-plum-egyp9oir.edgeone.dev/newspaper_transparent.png";
-        }
+    // 1. 背景画像を読み込み
+    bg.src = "template.png"; 
+
+    bg.onload = () => { 
+        cv.width = bg.width; 
+        cv.height = bg.height; 
+        render(); 
     };
 
-    bg.onload = render;
-
+    // 2. 写真のアップロード
     document.getElementById('photoIn').onchange = (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
         const reader = new FileReader();
         reader.onload = (f) => { 
             photo.src = f.target.result; 
             photo.onload = render; 
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(e.target.files[0]);
     };
 
     function render() {
-        // 全体を白で塗りつぶす (これが隙間のない白枠の正体になります)
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, cv.width, cv.height);
+        if (!bg.complete) return;
+        ctx.clearRect(0, 0, cv.width, cv.height);
 
         const scale = parseFloat(document.getElementById('zoom').value);
 
-        // --- STEP 1: 写真を背面描画 ---
+        // --- STEP 1: はみ出しを「新聞のサイズ」で完全にカットする ---
+        ctx.save();
+        ctx.beginPath();
+        // 新聞画像の大きさ(961x1102等)にクリッピングパスを作成
+        ctx.rect(0, 0, cv.width, cv.height);
+        ctx.clip(); // これ以降の描画は新聞の範囲内だけに制限される
+
+        // 写真を背面描画
         if (photo.src && photo.complete) {
             const pw = photo.width * scale, ph = photo.height * scale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
-            // 写真未挿入時のプレースホルダー
-            ctx.fillStyle = "#1a1a1a";
+            ctx.fillStyle = "#111";
             ctx.fillRect(107, 141, 755, 272);
         }
+        ctx.restore(); // 制限を解除（文字や新聞本体を描くため）
 
-        // --- STEP 2: 新聞テンプレートを重ねる ---
-        if (bg.complete) {
-            ctx.drawImage(bg, 0, 0);
-        }
+        // --- STEP 2: 背景（新聞枠）を上に重ねる ---
+        ctx.drawImage(bg, 0, 0);
 
-        // --- STEP 3: 文字を描画 (指定の数値に固定) ---
-        // タイトル
+        // --- STEP 3: 文字描画（指定の座標とサイズ） ---
+        
+        // タイトル: y=280 / 21px
         ctx.fillStyle = "#2c2c2c";
         ctx.textAlign = "center"; 
         ctx.font = "bold 21px serif";
         ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 280);
 
-        // 本文
+        // 本文: x=50, y=305 / 13px / maxWidth 440 / lineHeight 15
         ctx.textAlign = "left"; 
         ctx.font = "13px serif";
         wrapText(document.getElementById('txt').value || "Description text here...", 50, 305, 440, 15);
 
-        // ボタン (白文字)
+        // ボタン: y=535 / 19px / 白文字
         ctx.textAlign = "center"; 
         ctx.font = "bold 19px serif";
         ctx.fillStyle = "white";
-        ctx.fillText(document.getElementById('btnText') ? document.getElementById('btnText').value : (document.getElementById('btn').value || "Option Button"), cv.width/2, 535);
+        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 535);
     }
 
     function wrapText(text, x, y, maxWidth, lineHeight) {
-        text.split('\n').forEach(paragraph => {
+        text.split('\n').forEach(p => {
             let line = '';
-            const characters = paragraph.split('');
-            for (let n = 0; n < characters.length; n++) {
-                let testLine = line + characters[n];
-                if (ctx.measureText(testLine).width > maxWidth) {
+            const chars = p.split('');
+            for(let i=0; i<chars.length; i++) {
+                let test = line + chars[i];
+                if (ctx.measureText(test).width > maxWidth) {
                     ctx.fillText(line, x, y);
-                    line = characters[n];
-                    y += lineHeight;
-                } else {
-                    line = testLine;
-                }
+                    line = chars[i]; y += lineHeight;
+                } else { line = test; }
             }
-            ctx.fillText(line, x, y);
-            y += lineHeight;
+            ctx.fillText(line, x, y); y += lineHeight;
         });
     }
 
-    ['ttl','txt','btn','zoom'].forEach(id => {
-        document.getElementById(id).oninput = render;
-    });
+    ['ttl','txt','btn','zoom'].forEach(id => document.getElementById(id).oninput = render);
 
     cv.onmousedown = e => {
         drag = true; 
