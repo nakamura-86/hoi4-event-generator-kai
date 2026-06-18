@@ -111,17 +111,17 @@
         // タイトル: y=（実機の位置に準拠）
         ctx.textAlign = "center";
         ctx.font = "bold 32px serif";
-        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 530);
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 350);
 
         // 本文: y= から開始
         ctx.textAlign = "left";
         ctx.font = "20px serif";
-        wrapText(document.getElementById('txt').value || "Description text here...", 115, 575, 740, 26);
+        wrapText(document.getElementById('txt').value || "Description text here...", 115, 375, 740, 26);
 
         // ボタン: y=885（プレート中央）
         ctx.textAlign = "center";
         ctx.font = "bold 23px serif";
-        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 385);
+        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 585);
     }
 
     // 日本語対応の自動改行関数
