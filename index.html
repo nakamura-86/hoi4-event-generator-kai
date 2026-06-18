@@ -2,33 +2,36 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HOI4 イベント生成改</title>
+    <title>HOI4 ニュースジェネレーター - 最終調整版</title>
     <style>
         :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
-        body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; background: var(--bg); color: #eee; margin: 0; display: flex; padding: 20px; gap: 30px; justify-content: center; }
+        body { font-family: "Hiragino Mincho ProN", "MS PMincho", serif; background: var(--bg); color: #eee; margin: 0; display: flex; padding: 20px; gap: 30px; justify-content: center; }
         .sidebar { width: 380px; background: var(--panel); padding: 25px; border-radius: 12px; border: 1px solid #333; height: fit-content; box-shadow: 0 10px 30px #000; }
-        h1 { color: var(--gold); font-size: 24px; text-align: center; margin: 0 0 20px; }
-        .group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: bold; color: var(--gold); }
+        h1 { color: var(--gold); font-size: 22px; text-align: center; margin: 0 0 20px; }
+        .group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: bold; color: var(--gold); }
         input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; box-sizing: border-box; font-size: 15px; }
-        textarea { height: 160px; resize: none; line-height: 1.6; }
-        .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; }
+        textarea { height: 140px; resize: none; line-height: 1.5; }
+        .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
         input[type="range"] { flex: 1; accent-color: var(--gold); }
-        button#saveBtn { width: 100%; padding: 18px; background: #45a049; color: white; border: none; border-radius: 6px; font-size: 20px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button#saveBtn { width: 100%; padding: 16px; background: #45a049; color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; }
         button#saveBtn:hover { background: #52be57; }
         .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; box-shadow: 0 0 50px #000; }
         canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
-        .hint { font-size: 12px; color: #777; text-align: center; margin-top: 10px; font-style: italic; }
+        .hint { font-size: 11px; color: #777; text-align: center; margin-top: 10px; font-style: italic; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
-        <h1>HOI4 イベント生成</h1>
+        <h1>HOI4 EVENT GEN</h1>
         <div class="group">
             <label>1. 写真のアップロード</label>
             <input type="file" id="photoIn" accept="image/*">
-            <div class="slider-box"><span>ズーム</span><input type="range" id="zoom" min="0.1" max="4" step="0.01" value="0.85"></div>
+            <div class="slider-box">
+                <span style="font-size: 12px;">ズーム</span>
+                <input type="range" id="zoom" min="0.1" max="4" step="0.01" value="0.85">
+            </div>
         </div>
         <div class="group">
             <label>2. イベントタイトル</label>
@@ -36,14 +39,14 @@
         </div>
         <div class="group">
             <label>3. 説明内容</label>
-            <textarea id="txt" placeholder="ドイツはフランス国境近くのラインラントに軍を進駐させた…。"></textarea>
+            <textarea id="txt" placeholder="ドイツ軍が国境を越えて軍を進駐させた..."></textarea>
         </div>
         <div class="group">
-            <label>4. オプションラベル</label>
+            <label>4. 選択肢ボタン</label>
             <input type="text" id="btn" placeholder="ここはドイツの領土だ">
         </div>
-        <button id="saveBtn">PNG形式で保存</button>
-        <p class="hint">プレビュー画面で写真をドラッグして移動してください。</p>
+        <button id="saveBtn">PNGでエクスポート</button>
+        <p class="hint">写真はプレビュー上でドラッグして動かせます。</p>
     </div>
 
     <div class="viewport">
@@ -54,90 +57,85 @@
     const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
     const bg = new Image(), photo = new Image();
     
-    // 写真の状態管理用
-    let pos = {x: 485, y: 280};
-    let currentScale = 0.85;
-    let drag = false, start = {x: 0, y: 0};
+    // 状態管理
+    let pos = { x: 485, y: 280 };
+    let drag = false, start = { x: 0, y: 0 };
 
-    // 1. テンプレート画像を読み込み
+    // 1. テンプレート画像読み込み（961x1102）
     bg.src = "template.png"; 
     bg.onload = () => { 
-        cv.width = bg.width; 
-        cv.height = bg.height; 
+        cv.width = 961; 
+        cv.height = 1102; 
         render(); 
     };
 
-    // 2. 写真の読み込み処理
+    // 2. ニュース写真読み込み
     document.getElementById('photoIn').onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (f) => { 
             photo.src = f.target.result; 
-            photo.onload = () => {
-                // 読み込み時に中央へ配置
-                pos = {x: 485, y: 280};
-                render();
-            };
+            photo.onload = render; 
         };
         reader.readAsDataURL(file);
     };
 
-    // 描画メイン関数
+    // 描画コア関数
     function render() {
         ctx.clearRect(0, 0, cv.width, cv.height);
 
-        // スライダーから最新の拡大率を取得
-        currentScale = parseFloat(document.getElementById('zoom').value);
+        // スライダーから拡大率をリアルタイム取得（ここが重要）
+        const scale = parseFloat(document.getElementById('zoom').value);
 
-        // --- STEP 1: 写真を一番下に描画（切り抜かずに描画） ---
+        // A. 写真を描画（最背面）
         if (photo.src && photo.complete) {
-            const pw = photo.width * currentScale, ph = photo.height * currentScale;
+            const pw = photo.width * scale, ph = photo.height * scale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
-            // 写真がない時は枠内を暗く
             ctx.fillStyle = "#111";
             ctx.fillRect(107, 141, 755, 272);
         }
 
-        // --- STEP 2: 背景（template.png）を上に重ねる ---
+        // B. 新聞枠を重ねる（写真は透明部分から覗く）
         if (bg.complete) {
             ctx.drawImage(bg, 0, 0);
         }
 
-        // --- STEP 3: 文字を描画（位置をさらに上に修正） ---
+        // C. 文字描画（位置をさらに上に修正）
         ctx.fillStyle = "#2c2c2c";
         
-        // タイトル: y=455付近（実機の位置に準拠）
+        // タイトル: y=450 (写真枠のすぐ下)
         ctx.textAlign = "center"; 
         ctx.font = "bold 32px serif";
-        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width / 2, 455);
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width / 2, 450);
 
-        // 説明文: y=500付近から開始
+        // 説明文: y=490 から開始
         ctx.textAlign = "left"; 
         ctx.font = "20px serif";
-        wrapText(document.getElementById('txt').value || "Description text here...", 115, 500, 740, 26);
+        wrapText(document.getElementById('txt').value || "Description text here...", 115, 490, 740, 26);
 
-        // ボタン: プレート中央 y=885
+        // ボタン: y=885
         ctx.textAlign = "center"; 
         ctx.font = "bold 23px serif";
-        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width / 2, 885);
+        ctx.fillText(document.getElementById('btn').value || "Option Button Label", cv.width / 2, 885);
     }
 
-    // 文字の自動改行（日本語対応）
+    // 1文字ずつ判定する自動改行関数（日本語対応の肝）
     function wrapText(text, x, y, maxWidth, lineHeight) {
         const paragraphs = text.split('\n');
         paragraphs.forEach(p => {
             let line = '';
-            const chars = p.split('');
-            for(let i=0; i<chars.length; i++) {
-                let test = line + chars[i];
-                if (ctx.measureText(test).width > maxWidth) {
+            const characters = p.split('');
+            for (let i = 0; i < characters.length; i++) {
+                let testLine = line + characters[i];
+                let metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && i > 0) {
                     ctx.fillText(line, x, y);
-                    line = chars[i];
+                    line = characters[i];
                     y += lineHeight;
                 } else {
-                    line = test;
+                    line = testLine;
                 }
             }
             ctx.fillText(line, x, y);
@@ -145,32 +143,32 @@
         });
     }
 
-    // 入力項目変更時に即座に再描画
-    ['ttl','txt','btn','zoom'].forEach(id => {
-        document.getElementById(id).oninput = render;
+    // 入力項目変更時に即座に再描画（ズームも含む）
+    ['ttl', 'txt', 'btn', 'zoom'].forEach(id => {
+        document.getElementById(id).addEventListener('input', render);
     });
 
     // マウスドラッグ移動
     cv.onmousedown = e => {
         drag = true; 
         const r = cv.getBoundingClientRect(), s = cv.width/r.width;
-        start = {x: (e.clientX - r.left)*s, y: (e.clientY - r.top)*s};
+        start = { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s };
     };
     window.onmousemove = e => {
-        if(!drag) return;
+        if (!drag) return;
         const r = cv.getBoundingClientRect(), s = cv.width/r.width;
-        const mx = (e.clientX - r.left)*s, my = (e.clientY - r.top)*s;
+        const mx = (e.clientX - r.left) * s, my = (e.clientY - r.top) * s;
         pos.x += mx - start.x; 
         pos.y += my - start.y;
-        start = {x: mx, y: my}; 
+        start = { x: mx, y: my }; 
         render();
     };
     window.onmouseup = () => drag = false;
 
-    // 画像保存
+    // 保存ボタン
     document.getElementById('saveBtn').onclick = () => {
         const link = document.createElement('a'); 
-        link.download = 'hoi4_news.png';
+        link.download = 'hoi4_news_event.png';
         link.href = cv.toDataURL("image/png"); 
         link.click();
     };
