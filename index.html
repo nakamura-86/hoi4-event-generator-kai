@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoI4 News Generator - Perfect Edges</title>
+    <title>HoI4 News Generator - Ironclad Layout</title>
     <style>
         :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
@@ -10,11 +10,11 @@
         h1 { color: var(--gold); font-size: 20px; text-align: center; margin: 0 0 20px; text-transform: uppercase; letter-spacing: 2px; }
         .group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: bold; color: var(--gold); }
-        input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; box-sizing: border-box; }
-        textarea { height: 120px; resize: none; font-family: serif; font-size: 16px; }
+        input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        textarea { height: 120px; resize: none; line-height: 1.5; font-family: serif; }
         .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; }
         input[type="range"] { flex: 1; accent-color: var(--gold); }
-        button#saveBtn { width: 100%; padding: 15px; background: #45a049; color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button#saveBtn { width: 100%; padding: 15px; background: #45a049; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button#saveBtn:hover { background: #52be57; }
         .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; box-shadow: 0 0 50px #000; }
         canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
@@ -31,15 +31,15 @@
         </div>
         <div class="group">
             <label>2. EVENT TITLE</label>
-            <input type="text" id="ttl" placeholder="The Rhineland Remilitarized">
+            <input type="text" id="ttl" placeholder="Title here">
         </div>
         <div class="group">
             <label>3. DESCRIPTION CONTENT</label>
-            <textarea id="txt" placeholder="German troops have entered the Rhineland..."></textarea>
+            <textarea id="txt" placeholder="Description here..."></textarea>
         </div>
         <div class="group">
             <label>4. OPTION LABEL</label>
-            <input type="text" id="btn" placeholder="This is German territory.">
+            <input type="text" id="btn" placeholder="Button text">
         </div>
         <button id="saveBtn">EXPORT AS PNG</button>
     </div>
@@ -51,7 +51,7 @@
 <script>
     const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
     const bg = new Image(), photo = new Image();
-    let pos = {x: 485, y: 280}, drag = false, start = {x: 0, y: 0};
+    let pos = {x: 485, y: 280}, photoScale = 0.85, drag = false, start = {x: 0, y: 0};
 
     // 1. 背景画像を読み込み
     bg.src = "template.png"; 
@@ -75,41 +75,47 @@
 
     function render() {
         if (!bg.complete) return;
+        
         ctx.clearRect(0, 0, cv.width, cv.height);
 
-        const scale = parseFloat(document.getElementById('zoom').value);
+        // 背景全体を白で初期化 (新聞の外側を白くするため)
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, cv.width, cv.height);
+
+        // 最新のズーム値を取得
+        photoScale = parseFloat(document.getElementById('zoom').value);
 
         // --- STEP 1: 写真を一番下に描画 ---
         if (photo.src && photo.complete) {
-            const pw = photo.width * scale, ph = photo.height * scale;
+            const pw = photo.width * photoScale, ph = photo.height * photoScale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
+            // 写真がない時は穴を暗くしておく
             ctx.fillStyle = "#111";
             ctx.fillRect(107, 141, 755, 272);
         }
 
-        // --- STEP 2: 新聞背景を重ねる ---
+        // --- STEP 2: 背景（新聞枠）を上に重ねる ---
         ctx.drawImage(bg, 0, 0);
 
-        // --- STEP 3: 【解決策】新聞の外側の透明部分だけを白で塗りつぶす ---
-        // 特殊な合成モード 'destination-over' を使います。
-        // これは「既に描かれているものの背後に描く」という命令です。
-        // 背景の新聞も写真も無い「透明な場所」だけに白が塗られます。
-        ctx.globalCompositeOperation = 'destination-over';
+        // --- STEP 3: 【解決策】新聞の外側を太い白枠で覆い隠す ---
+        // 新聞の絵に被らないギリギリのラインで、はみ出た写真を消します
         ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, cv.width, cv.height);
-        
-        // モードを元に戻す
-        ctx.globalCompositeOperation = 'source-over';
+        const offset = 12; // 新聞の端から内側への距離（太すぎず細すぎない絶妙なライン）
+        ctx.fillRect(0, 0, offset, cv.height); // 左壁
+        ctx.fillRect(cv.width - offset, 0, offset, cv.height); // 右壁
+        ctx.fillRect(0, 0, cv.width, offset); // 上壁
+        ctx.fillRect(0, cv.height - offset, cv.width, offset); // 下壁
 
         // --- STEP 4: 文字を描画 (確定座標) ---
-        // タイトル: y=280
         ctx.fillStyle = "#2c2c2c";
+        
+        // タイトル: y=280 / 21px
         ctx.textAlign = "center"; 
         ctx.font = "bold 21px serif";
         ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 280);
 
-        // 本文: y=305 / 13px / maxWidth 440 / lineHeight 15
+        // 本文: x=50, y=305 / 13px / maxWidth 440 / lineHeight 15
         ctx.textAlign = "left"; 
         ctx.font = "13px serif";
         wrapText(document.getElementById('txt').value || "Description text here...", 50, 305, 440, 15);
@@ -140,8 +146,12 @@
         });
     }
 
-    ['ttl','txt','btn','zoom'].forEach(id => document.getElementById(id).oninput = render);
+    // 全入力同期
+    ['ttl','txt','btn','zoom'].forEach(id => {
+        document.getElementById(id).oninput = render;
+    });
 
+    // 写真のドラッグ操作
     cv.onmousedown = e => {
         drag = true; 
         const r = cv.getBoundingClientRect(), s = cv.width/r.width;
