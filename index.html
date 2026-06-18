@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoI4 News Generator - Frame Masking</title>
+    <title>HoI4 News Generator - Refined Frame</title>
     <style>
         :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
@@ -18,6 +18,7 @@
         button#saveBtn:hover { background: #52be57; }
         .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; box-shadow: 0 0 50px #000; }
         canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
+        .hint { font-size: 11px; color: #777; text-align: center; margin-top: 10px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -42,6 +43,7 @@
             <input type="text" id="btn" placeholder="This is German territory.">
         </div>
         <button id="saveBtn">EXPORT AS PNG</button>
+        <p class="hint">Drag the photo in the preview to move it.</p>
     </div>
 
     <div class="viewport">
@@ -80,88 +82,37 @@
 
         const scale = parseFloat(document.getElementById('zoom').value);
 
-        // --- STEP 1: 写真を最背面に描画（まずは普通に描く） ---
-        if (photo.src && photo.complete) {
+        // --- STEP 1: 写真を一番下に描画 ---
+        if (photo.src) {
             const pw = photo.width * scale, ph = photo.height * scale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
-            ctx.fillStyle = "#111";
+            ctx.fillStyle = "#111"; // 写真がない時は黒
             ctx.fillRect(107, 141, 755, 272);
         }
 
-        // --- STEP 2: 新聞背景を重ねる ---
+        // --- STEP 2: 背景（新聞枠）を上に重ねる ---
         ctx.drawImage(bg, 0, 0);
 
-        // --- STEP 3: 【重要】新聞の外側を白で塗りつぶして隠す ---
-        // 新聞のギザギザの外側に写真がはみ出さないよう、四辺に白い「目隠し」を置く
+        // --- STEP 3: 【重要】新聞の外側を白で塗りつぶして隠す (太さを調整) ---
+        // 新聞の四辺ギリギリの位置に白い目隠しを配置。
+        // 前回の20pxだと太すぎたため、デザインを邪魔しない10pxに変更しました。
         ctx.fillStyle = "white";
-        // 左側隠し
-        ctx.fillRect(0, 0, 20, cv.height);
-        // 右側隠し
-        ctx.fillRect(cv.width - 20, 0, 20, cv.height);
-        // 上側隠し
-        ctx.fillRect(0, 0, cv.width, 20);
-        // 下側隠し
-        ctx.fillRect(0, cv.height - 20, cv.width, 20);
+        const b = 10; // 目隠し幅
+        ctx.fillRect(0, 0, b, cv.height); // 左
+        ctx.fillRect(cv.width - b, 0, b, cv.height); // 右
+        ctx.fillRect(0, 0, cv.width, b); // 上
+        ctx.fillRect(0, cv.height - b, cv.width, b); // 下
 
-        // --- STEP 4: 文字描画（指定の数値に固定） ---
+        // --- STEP 4: 文字を描画 (確定座標) ---
+        ctx.fillStyle = "#2c2c2c";
         
         // タイトル: y=280
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#2c2c2c";
+        ctx.textAlign = "center"; 
         ctx.font = "bold 21px serif";
         ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 280);
 
-        // 本文: x=50, y=305, maxWidth=440, lineHeight=15, 13px
-        ctx.textAlign = "left";
+        // 本文: y=305 / 13px
+        ctx.textAlign = "left"; 
         ctx.font = "13px serif";
-        wrapText(document.getElementById('txt').value || "Description text here...", 50, 305, 440, 15);
-
-        // ボタン: y=535, 19px, 白文字
-        ctx.textAlign = "center";
-        ctx.font = "bold 19px serif";
-        ctx.fillStyle = "white";
-        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 535);
-    }
-
-    function wrapText(text, x, y, maxWidth, lineHeight) {
-        text.split('\n').forEach(p => {
-            let line = '';
-            const chars = p.split('');
-            for(let i=0; i<chars.length; i++) {
-                let test = line + chars[i];
-                if (ctx.measureText(test).width > maxWidth) {
-                    ctx.fillText(line, x, y);
-                    line = chars[i]; y += lineHeight;
-                } else { line = test; }
-            }
-            ctx.fillText(line, x, y); y += lineHeight;
-        });
-    }
-
-    ['ttl','txt','btn','zoom'].forEach(id => document.getElementById(id).oninput = render);
-
-    cv.onmousedown = e => {
-        drag = true; 
-        const r = cv.getBoundingClientRect(), s = cv.width/r.width;
-        start = {x: (e.clientX - r.left)*s, y: (e.clientY - r.top)*s};
-    };
-    window.onmousemove = e => {
-        if(!drag) return;
-        const r = cv.getBoundingClientRect(), s = cv.width/r.width;
-        const mx = (e.clientX - r.left)*s, my = (e.clientY - r.top)*s;
-        pos.x += mx - start.x; pos.y += my - start.y;
-        start = {x: mx, y: my}; 
-        render();
-    };
-    window.onmouseup = () => drag = false;
-
-    document.getElementById('saveBtn').onclick = () => {
-        const link = document.createElement('a'); 
-        link.download = 'hoi4_news.png';
-        link.href = cv.toDataURL("image/png"); 
-        link.click();
-    };
-</script>
-</body>
-</html>
+        wrapText(document.getElementById('txt').value || "De
