@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HOI4 イベント生成</title>
+    <title>HOI4 イベント生成改</title>
     <style>
         :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
         body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; background: var(--bg); color: #eee; margin: 0; display: flex; padding: 20px; gap: 30px; justify-content: center; }
@@ -11,7 +11,7 @@
         .group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: bold; color: var(--gold); }
         input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; box-sizing: border-box; font-size: 15px; }
-        textarea { height: 150px; resize: none; line-height: 1.6; }
+        textarea { height: 160px; resize: none; line-height: 1.6; }
         .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; }
         input[type="range"] { flex: 1; accent-color: var(--gold); }
         button#saveBtn { width: 100%; padding: 18px; background: #45a049; color: white; border: none; border-radius: 6px; font-size: 20px; font-weight: bold; cursor: pointer; transition: 0.2s; }
@@ -32,17 +32,17 @@
         </div>
         <div class="group">
             <label>2. イベントタイトル</label>
-            <input type="text" id="ttl" placeholder="ラインラントの再軍事化">
+            <input type="text" id="ttl" placeholder="ラインラント進駐">
         </div>
         <div class="group">
             <label>3. 説明内容</label>
-            <textarea id="txt" placeholder="ドイツ軍がラインラントに侵攻した…。"></textarea>
+            <textarea id="txt" placeholder="ドイツはフランス国境近くのラインラントに軍を進駐させた…。"></textarea>
         </div>
         <div class="group">
             <label>4. オプションラベル</label>
-            <input type="text" id="btn" placeholder="ここはドイツ領だ。">
+            <input type="text" id="btn" placeholder="ここはドイツの領土だ">
         </div>
-        <button id="saveBtn">PNG形式でエクスポート</button>
+        <button id="saveBtn">PNG形式で保存</button>
         <p class="hint">プレビュー画面で写真をドラッグして移動してください。</p>
     </div>
 
@@ -54,71 +54,81 @@
     const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
     const bg = new Image(), photo = new Image();
     
-    // 初期値
+    // 写真の状態管理用
     let pos = {x: 485, y: 280};
+    let currentScale = 0.85;
     let drag = false, start = {x: 0, y: 0};
 
     // 1. テンプレート画像を読み込み
     bg.src = "template.png"; 
-
     bg.onload = () => { 
         cv.width = bg.width; 
         cv.height = bg.height; 
         render(); 
     };
 
-    // 2. 写真のアップロード
+    // 2. 写真の読み込み処理
     document.getElementById('photoIn').onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
         const reader = new FileReader();
         reader.onload = (f) => { 
             photo.src = f.target.result; 
-            photo.onload = render; 
+            photo.onload = () => {
+                // 読み込み時に中央へ配置
+                pos = {x: 485, y: 280};
+                render();
+            };
         };
-        reader.readAsDataURL(e.target.files[0]);
+        reader.readAsDataURL(file);
     };
 
+    // 描画メイン関数
     function render() {
         ctx.clearRect(0, 0, cv.width, cv.height);
 
-        // --- STEP 1: 写真を一番下に描画 ---
-        if (photo.src) {
-            // スライダーからリアルタイムに拡大率を取得
-            const scale = parseFloat(document.getElementById('zoom').value);
-            const pw = photo.width * scale, ph = photo.height * scale;
+        // スライダーから最新の拡大率を取得
+        currentScale = parseFloat(document.getElementById('zoom').value);
+
+        // --- STEP 1: 写真を一番下に描画（切り抜かずに描画） ---
+        if (photo.src && photo.complete) {
+            const pw = photo.width * currentScale, ph = photo.height * currentScale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
+            // 写真がない時は枠内を暗く
             ctx.fillStyle = "#111";
             ctx.fillRect(107, 141, 755, 272);
         }
 
-        // --- STEP 2: 背景（新聞枠）を上に重ねる ---
-        ctx.drawImage(bg, 0, 0);
+        // --- STEP 2: 背景（template.png）を上に重ねる ---
+        if (bg.complete) {
+            ctx.drawImage(bg, 0, 0);
+        }
 
-        // --- STEP 3: 文字を描画 ---
+        // --- STEP 3: 文字を描画（位置をさらに上に修正） ---
         ctx.fillStyle = "#2c2c2c";
         
-        // タイトル: さらに上（y=440付近）へ移動
+        // タイトル: y=455付近（実機の位置に準拠）
         ctx.textAlign = "center"; 
         ctx.font = "bold 32px serif";
-        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 440);
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width / 2, 455);
 
-        // 説明文: 開始位置を上（y=485付近）に、行間を26pxに設定
+        // 説明文: y=500付近から開始
         ctx.textAlign = "left"; 
         ctx.font = "20px serif";
-        wrapText(document.getElementById('txt').value || "Description text here...", 115, 485, 740, 26);
+        wrapText(document.getElementById('txt').value || "Description text here...", 115, 500, 740, 26);
 
-        // ボタン: プレートの中央（y=880付近）に
+        // ボタン: プレート中央 y=885
         ctx.textAlign = "center"; 
         ctx.font = "bold 23px serif";
-        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 880);
+        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width / 2, 885);
     }
 
-    // 自動改行関数
+    // 文字の自動改行（日本語対応）
     function wrapText(text, x, y, maxWidth, lineHeight) {
         const paragraphs = text.split('\n');
         paragraphs.forEach(p => {
             let line = '';
-            // 日本語・英語混在対応のため1文字ずつ処理
             const chars = p.split('');
             for(let i=0; i<chars.length; i++) {
                 let test = line + chars[i];
@@ -135,12 +145,12 @@
         });
     }
 
-    // 全入力項目でリアルタイム更新を有効化
+    // 入力項目変更時に即座に再描画
     ['ttl','txt','btn','zoom'].forEach(id => {
         document.getElementById(id).oninput = render;
     });
 
-    // 写真の移動操作（PC/スマホ対応用）
+    // マウスドラッグ移動
     cv.onmousedown = e => {
         drag = true; 
         const r = cv.getBoundingClientRect(), s = cv.width/r.width;
@@ -157,10 +167,10 @@
     };
     window.onmouseup = () => drag = false;
 
-    // 画像として保存
+    // 画像保存
     document.getElementById('saveBtn').onclick = () => {
         const link = document.createElement('a'); 
-        link.download = 'hoi4_news_event.png';
+        link.download = 'hoi4_news.png';
         link.href = cv.toDataURL("image/png"); 
         link.click();
     };
