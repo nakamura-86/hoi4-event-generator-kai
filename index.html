@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoI4 News Generator - Precise Layout</title>
+    <title>HoI4 News Generator - Ultra Stable</title>
     <style>
         :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
@@ -45,7 +45,7 @@
     </div>
 
     <div class="viewport">
-        <canvas id="cv"></canvas>
+        <canvas id="cv" width="961" height="1102"></canvas>
     </div>
 
 <script>
@@ -53,16 +53,19 @@
     const bg = new Image(), photo = new Image();
     let pos = {x: 485, y: 280}, drag = false, start = {x: 0, y: 0};
 
-    // 1. 背景画像を読み込み
-    bg.src = "template.png"; 
-
-    bg.onload = () => { 
-        cv.width = bg.width; 
-        cv.height = bg.height; 
-        render(); 
+    // 背景画像の読み込み (URLを2段階で設定して確実に表示させる)
+    bg.crossOrigin = "anonymous";
+    bg.src = "template.png"; // まずはローカルを探す
+    
+    // 画像が読み込めなかった時のための予備URL
+    bg.onerror = () => {
+        if(bg.src.indexOf('edgeone.dev') === -1) {
+            bg.src = "https://quintessential-plum-egyp9oir.edgeone.dev/newspaper_transparent.png";
+        }
     };
 
-    // 2. 写真のアップロード
+    bg.onload = render;
+
     document.getElementById('photoIn').onchange = (e) => {
         const file = e.target.files[0];
         if(!file) return;
@@ -75,46 +78,40 @@
     };
 
     function render() {
-        if (!bg.complete) return;
-        ctx.clearRect(0, 0, cv.width, cv.height);
+        // 全体を白で塗りつぶす (これが隙間のない白枠の正体になります)
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, cv.width, cv.height);
 
         const scale = parseFloat(document.getElementById('zoom').value);
 
-        // --- STEP 1: 写真を描画 (一番下) ---
+        // --- STEP 1: 写真を背面描画 ---
         if (photo.src && photo.complete) {
             const pw = photo.width * scale, ph = photo.height * scale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
+            // 写真未挿入時のプレースホルダー
             ctx.fillStyle = "#1a1a1a";
             ctx.fillRect(107, 141, 755, 272);
         }
 
         // --- STEP 2: 新聞テンプレートを重ねる ---
-        ctx.drawImage(bg, 0, 0);
+        if (bg.complete) {
+            ctx.drawImage(bg, 0, 0);
+        }
 
-        // --- STEP 3: 【細い白枠】隙間なく外側を隠す ---
-        // 前回の10pxから4pxへ変更。新聞のフチにピッタリ合わせます。
-        ctx.fillStyle = "white";
-        const b = 4; // 目隠し幅（最小限）
-        ctx.fillRect(0, 0, b, cv.height); // 左端
-        ctx.fillRect(cv.width - b, 0, b, cv.height); // 右端
-        ctx.fillRect(0, 0, cv.width, b); // 上端
-        ctx.fillRect(0, cv.height - b, cv.width, b); // 下端
-
-        // --- STEP 4: 文字を描画 (確定座標の維持) ---
+        // --- STEP 3: 文字を描画 (指定の数値に固定) ---
+        // タイトル
         ctx.fillStyle = "#2c2c2c";
-        
-        // タイトル: y=280
         ctx.textAlign = "center"; 
         ctx.font = "bold 21px serif";
         ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 280);
 
-        // 本文: y=305 / 13px / width 440 / lineHeight 15
+        // 本文
         ctx.textAlign = "left"; 
         ctx.font = "13px serif";
         wrapText(document.getElementById('txt').value || "Description text here...", 50, 305, 440, 15);
 
-        // ボタン: y=535 / 19px / 白文字
+        // ボタン (白文字)
         ctx.textAlign = "center"; 
         ctx.font = "bold 19px serif";
         ctx.fillStyle = "white";
@@ -122,17 +119,17 @@
     }
 
     function wrapText(text, x, y, maxWidth, lineHeight) {
-        text.split('\n').forEach(p => {
+        text.split('\n').forEach(paragraph => {
             let line = '';
-            const chars = p.split('');
-            for(let i=0; i<chars.length; i++) {
-                let test = line + chars[i];
-                if (ctx.measureText(test).width > maxWidth) {
+            const characters = paragraph.split('');
+            for (let n = 0; n < characters.length; n++) {
+                let testLine = line + characters[n];
+                if (ctx.measureText(testLine).width > maxWidth) {
                     ctx.fillText(line, x, y);
-                    line = chars[i];
+                    line = characters[n];
                     y += lineHeight;
                 } else {
-                    line = test;
+                    line = testLine;
                 }
             }
             ctx.fillText(line, x, y);
