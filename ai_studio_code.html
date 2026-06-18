@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HoI4 World News Generator</title>
+    <style>
+        :root { --gold: #d4af37; --bg: #121212; --panel: #252525; }
+        body { font-family: 'Georgia', serif; background: var(--bg); color: #eee; margin: 0; display: flex; padding: 20px; gap: 30px; justify-content: center; }
+        .sidebar { width: 360px; background: var(--panel); padding: 25px; border-radius: 12px; border: 1px solid #333; height: fit-content; }
+        h1 { color: var(--gold); font-size: 20px; text-align: center; margin: 0 0 20px; text-transform: uppercase; }
+        .group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: bold; color: var(--gold); }
+        input[type="text"], textarea, input[type="file"] { width: 100%; background: #151515; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; box-sizing: border-box; }
+        textarea { height: 120px; resize: none; }
+        .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; }
+        input[type="range"] { flex: 1; accent-color: var(--gold); }
+        button#saveBtn { width: 100%; padding: 15px; background: #45a049; color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; }
+        canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h1>HOI4 EVENT GEN</h1>
+        <div class="group">
+            <label>1. PHOTO UPLOAD</label>
+            <input type="file" id="photoIn" accept="image/*">
+            <div class="slider-box"><span>Zoom</span><input type="range" id="zoom" min="0.1" max="4" step="0.01" value="0.85"></div>
+        </div>
+        <div class="group">
+            <label>2. EVENT TITLE</label>
+            <input type="text" id="ttl" placeholder="The Rhineland Remilitarized">
+        </div>
+        <div class="group">
+            <label>3. DESCRIPTION</label>
+            <textarea id="txt" placeholder="German troops have entered..."></textarea>
+        </div>
+        <div class="group">
+            <label>4. BUTTON LABEL</label>
+            <input type="text" id="btn" placeholder="This is German territory.">
+        </div>
+        <button id="saveBtn">EXPORT AS PNG</button>
+    </div>
+
+    <div class="viewport">
+        <canvas id="cv"></canvas>
+    </div>
+
+<script>
+    const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+    const bg = new Image(), photo = new Image();
+    let pos = {x: 485, y: 275}, scale = 0.85, drag = false, start = {x: 0, y: 0};
+    const BOX = { x: 107, y: 141, w: 755, h: 272 };
+
+    // --- ここで同じフォルダ内の画像を読み込む ---
+    bg.src = "template.png"; 
+
+    bg.onload = () => { cv.width = bg.width; cv.height = bg.height; render(); };
+
+    document.getElementById('photoIn').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (f) => { photo.src = f.target.result; photo.onload = render; };
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    function render() {
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        if (photo.src) {
+            ctx.save();
+            ctx.beginPath(); ctx.rect(BOX.x, BOX.y, BOX.w, BOX.h); ctx.clip();
+            const pw = photo.width * scale, ph = photo.height * scale;
+            ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
+            ctx.restore();
+        }
+        ctx.drawImage(bg, 0, 0);
+        ctx.fillStyle = "#2c2c2c";
+        ctx.textAlign = "center"; ctx.font = "bold 32px serif";
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 458);
+        ctx.textAlign = "left"; ctx.font = "20px serif";
+        wrapText(document.getElementById('txt').value || "Description here...", 115, 510, 740, 28);
+        ctx.textAlign = "center"; ctx.font = "bold 23px serif";
+        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 888);
+    }
+
+    function wrapText(text, x, y, maxWidth, lineHeight) {
+        text.split('\n').forEach(p => {
+            let line = '';
+            p.split(' ').forEach(word => {
+                let test = line + word + ' ';
+                if (ctx.measureText(test).width > maxWidth) {
+                    ctx.fillText(line, x, y); line = word + ' '; y += lineHeight;
+                } else { line = test; }
+            });
+            ctx.fillText(line, x, y); y += lineHeight;
+        });
+    }
+
+    ['ttl','txt','btn','zoom'].forEach(id => document.getElementById(id).oninput = () => {
+        scale = document.getElementById('zoom').value; render();
+    });
+
+    cv.onmousedown = e => {
+        drag = true; const r = cv.getBoundingClientRect(), s = cv.width/r.width;
+        start = {x: (e.clientX - r.left)*s, y: (e.clientY - r.top)*s};
+    };
+    window.onmousemove = e => {
+        if(!drag) return;
+        const r = cv.getBoundingClientRect(), s = cv.width/r.width;
+        const mx = (e.clientX - r.left)*s, my = (e.clientY - r.top)*s;
+        pos.x += mx - start.x; pos.y += my - start.y;
+        start = {x: mx, y: my}; render();
+    };
+    window.onmouseup = () => drag = false;
+    document.getElementById('saveBtn').onclick = () => {
+        const link = document.createElement('a'); link.download = 'hoi4_news.png';
+        link.href = cv.toDataURL("image/png"); link.click();
+    };
+</script>
+</body>
+</html>
