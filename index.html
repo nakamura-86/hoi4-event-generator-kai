@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoI4 News Generator - Frame Masking</title>
+    <title>HoI4 News Generator - Perfect Edges</title>
     <style>
         :root { --gold: #d4af37; --bg: #121212; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
@@ -55,7 +55,6 @@
 
     // 1. 背景画像を読み込み
     bg.src = "template.png"; 
-
     bg.onload = () => { 
         cv.width = bg.width; 
         cv.height = bg.height; 
@@ -80,7 +79,7 @@
 
         const scale = parseFloat(document.getElementById('zoom').value);
 
-        // --- STEP 1: 写真を最背面に描画（まずは普通に描く） ---
+        // --- STEP 1: 写真を一番下に描画 ---
         if (photo.src && photo.complete) {
             const pw = photo.width * scale, ph = photo.height * scale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
@@ -92,50 +91,52 @@
         // --- STEP 2: 新聞背景を重ねる ---
         ctx.drawImage(bg, 0, 0);
 
-        // --- STEP 3: 【重要】新聞の外側を白で塗りつぶして隠す ---
-        // 新聞のギザギザの外側に写真がはみ出さないよう、四辺に白い「目隠し」を置く
+        // --- STEP 3: 【解決策】新聞の外側の透明部分だけを白で塗りつぶす ---
+        // 特殊な合成モード 'destination-over' を使います。
+        // これは「既に描かれているものの背後に描く」という命令です。
+        // 背景の新聞も写真も無い「透明な場所」だけに白が塗られます。
+        ctx.globalCompositeOperation = 'destination-over';
         ctx.fillStyle = "white";
-        // 左側隠し
-        ctx.fillRect(0, 0, 20, cv.height);
-        // 右側隠し
-        ctx.fillRect(cv.width - 20, 0, 20, cv.height);
-        // 上側隠し
-        ctx.fillRect(0, 0, cv.width, 20);
-        // 下側隠し
-        ctx.fillRect(0, cv.height - 20, cv.width, 20);
-
-        // --- STEP 4: 文字描画（指定の数値に固定） ---
+        ctx.fillRect(0, 0, cv.width, cv.height);
         
+        // モードを元に戻す
+        ctx.globalCompositeOperation = 'source-over';
+
+        // --- STEP 4: 文字を描画 (確定座標) ---
         // タイトル: y=280
-        ctx.textAlign = "center";
         ctx.fillStyle = "#2c2c2c";
+        ctx.textAlign = "center"; 
         ctx.font = "bold 21px serif";
         ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 280);
 
-        // 本文: x=50, y=305, maxWidth=440, lineHeight=15, 13px
-        ctx.textAlign = "left";
+        // 本文: y=305 / 13px / maxWidth 440 / lineHeight 15
+        ctx.textAlign = "left"; 
         ctx.font = "13px serif";
         wrapText(document.getElementById('txt').value || "Description text here...", 50, 305, 440, 15);
 
-        // ボタン: y=535, 19px, 白文字
-        ctx.textAlign = "center";
+        // ボタン: y=535 / 19px / 白文字
+        ctx.textAlign = "center"; 
         ctx.font = "bold 19px serif";
         ctx.fillStyle = "white";
         ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 535);
     }
 
     function wrapText(text, x, y, maxWidth, lineHeight) {
-        text.split('\n').forEach(p => {
+        text.split('\n').forEach(paragraph => {
             let line = '';
-            const chars = p.split('');
-            for(let i=0; i<chars.length; i++) {
-                let test = line + chars[i];
-                if (ctx.measureText(test).width > maxWidth) {
+            const characters = paragraph.split('');
+            for (let n = 0; n < characters.length; n++) {
+                let testLine = line + characters[n];
+                if (ctx.measureText(testLine).width > maxWidth) {
                     ctx.fillText(line, x, y);
-                    line = chars[i]; y += lineHeight;
-                } else { line = test; }
+                    line = characters[n];
+                    y += lineHeight;
+                } else {
+                    line = testLine;
+                }
             }
-            ctx.fillText(line, x, y); y += lineHeight;
+            ctx.fillText(line, x, y);
+            y += lineHeight;
         });
     }
 
