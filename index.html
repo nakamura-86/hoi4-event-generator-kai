@@ -2,22 +2,28 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoI4 News Generator - Fixed Layout</title>
+    <title>HoI4 Event Generator - CSS Style Config</title>
     <style>
         :root { --gold: #d4af37; --bg: #000; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
+        
+        /* 操作パネルの装飾 */
         .sidebar { width: 360px; background: var(--panel); padding: 25px; border-radius: 12px; border: 1px solid #333; height: fit-content; box-shadow: 0 10px 30px #000; }
         h1 { color: var(--gold); font-size: 22px; text-align: center; margin: 0 0 20px; letter-spacing: 2px; }
         .group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: bold; color: var(--gold); }
         input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
         textarea { height: 160px; resize: none; line-height: 1.5; }
-        .slider-box { display: flex; align-items: center; gap: 15px; margin-top: 10px; font-size: 13px; }
+        
+        .slider-box { display: flex; align-items: center; gap: 15px; margin-top: 10px; }
         input[type="range"] { flex: 1; accent-color: var(--gold); }
+        
         button#saveBtn { width: 100%; padding: 18px; background: #45a049; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button#saveBtn:hover { background: #52be57; }
+        button#saveBtn:hover { background: #52be57; transform: translateY(-2px); }
+
+        /* プレビューエリア（Canvas） */
         .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; }
-        canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
+        canvas { display: block; max-height: 92vh; max-width: 100%; cursor: move; }
         .hint { font-size: 11px; color: #777; text-align: center; margin-top: 15px; font-style: italic; }
     </style>
 </head>
@@ -25,25 +31,33 @@
 
     <div class="sidebar">
         <h1>HOI4 EVENT GEN</h1>
+        
         <div class="group">
             <label>1. イベント写真を選択</label>
             <input type="file" id="photoIn" accept="image/*">
-            <div class="slider-box"><span>ズーム</span><input type="range" id="zoom" min="0.1" max="4" step="0.01" value="0.85"></div>
+            <div class="slider-box">
+                <span style="font-size: 12px; color: var(--gold);">ズーム</span>
+                <input type="range" id="zoom" min="0.1" max="4" step="0.01" value="0.85">
+            </div>
         </div>
+
         <div class="group">
             <label>2. イベントタイトル</label>
             <input type="text" id="ttl" placeholder="ラインラント進駐">
         </div>
+
         <div class="group">
-            <label>3. 本文</label>
-            <textarea id="txt" placeholder="説明文を入力..."></textarea>
+            <label>3. 本文内容</label>
+            <textarea id="txt" placeholder="ドイツ軍が国境を越えて軍を進駐させた..."></textarea>
         </div>
+
         <div class="group">
-            <label>4. オプションラベル</label>
+            <label>4. 選択肢テキスト</label>
             <input type="text" id="btn" placeholder="ここはドイツの領土だ">
         </div>
+
         <button id="saveBtn">PNG形式で保存</button>
-        <p class="hint">プレビュー画面で写真をドラッグして移動できます。</p>
+        <p class="hint">プレビュー上の写真はドラッグで移動できます。</p>
     </div>
 
     <div class="viewport">
@@ -51,22 +65,32 @@
     </div>
 
 <script>
+    // --- LAYOUT CONFIG (CSSのようにここを調整してください) ---
+    const CONFIG = {
+        canvas: { w: 961, h: 1102 },
+        // 写真表示エリア（template.pngの白い穴の位置）
+        photoHole: { x: 107, y: 141, w: 755, h: 272 },
+        // 文字位置設定 (y座標を劇的に引き上げ)
+        title:  { x: 480, y: 440, font: "bold 32px serif" },
+        body:   { x: 115, y: 480, w: 730, font: "20px serif", lh: 26 },
+        button: { x: 480, y: 888, font: "bold 23px serif" }
+    };
+
     const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
     const bg = new Image(), photo = new Image();
     
-    // 状態管理
-    let pos = {x: 485, y: 275}, drag = false, start = {x: 0, y: 0};
+    let pos = {x: CONFIG.canvas.w / 2, y: 280};
+    let drag = false, start = {x: 0, y: 0};
 
-    // 1. 新聞画像を読み込み
+    // 背景画像の自動読み込み
     bg.src = "template.png"; 
-
     bg.onload = () => {
-        cv.width = bg.width;  // 961
-        cv.height = bg.height; // 1102
+        cv.width = CONFIG.canvas.w;
+        cv.height = CONFIG.canvas.h;
         render();
     };
 
-    // 2. 写真のアップロード
+    // 写真のアップロード処理
     document.getElementById('photoIn').onchange = (e) => {
         const file = e.target.files[0];
         if(!file) return;
@@ -84,12 +108,11 @@
         ctx.clearRect(0, 0, cv.width, cv.height);
         const scale = parseFloat(document.getElementById('zoom').value);
 
-        // --- STEP 1: はみ出し防止（クリッピング） ---
+        // --- STEP 1: はみ出し防止（クリッピングマスク） ---
         ctx.save();
         ctx.beginPath();
-        // 新聞の四角い範囲内（10, 10 から 940, 1080）のみを描画対象にする
-        // これで角から写真が漏れるのを防ぎます
-        ctx.rect(10, 10, 941, 1082); 
+        // 新聞の外枠（ギリギリ透明じゃない部分）でクリップ
+        ctx.rect(10, 10, cv.width - 20, cv.height - 20);
         ctx.clip();
         
         // 写真を背面（新聞の下）に描画
@@ -98,33 +121,33 @@
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
             ctx.fillStyle = "#111";
-            ctx.fillRect(107, 141, 755, 272);
+            ctx.fillRect(CONFIG.photoHole.x, CONFIG.photoHole.y, CONFIG.photoHole.w, CONFIG.photoHole.h);
         }
         ctx.restore(); // クリッピング解除
 
-        // --- STEP 2: 背景（新聞枠）を上に重ねる ---
+        // --- STEP 2: 新聞テンプレートを上に重ねる ---
         ctx.drawImage(bg, 0, 0);
 
-        // --- STEP 3: 文字描画（大幅に上に移動） ---
+        // --- STEP 3: テキスト描画 (CONFIGに基づいた配置) ---
         ctx.fillStyle = "#2c2c2c";
         
-        // タイトル: y=（実機の位置に準拠）
+        // タイトル
         ctx.textAlign = "center";
-        ctx.font = "bold 32px serif";
-        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 250);
+        ctx.font = CONFIG.title.font;
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", CONFIG.title.x, CONFIG.title.y);
 
-        // 本文: y= から開始
+        // 本文（自動改行）
         ctx.textAlign = "left";
-        ctx.font = "20px serif";
-        wrapText(document.getElementById('txt').value || "Description text here...", 80, 280, 740, 26);
+        ctx.font = CONFIG.body.font;
+        wrapText(document.getElementById('txt').value || "Description text here...", CONFIG.body.x, CONFIG.body.y, CONFIG.body.w, CONFIG.body.lh);
 
-        // ボタン: y=885（プレート中央）
+        // ボタン
         ctx.textAlign = "center";
-        ctx.font = "bold 23px serif";
-        ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 585);
+        ctx.font = CONFIG.button.font;
+        ctx.fillText(document.getElementById('btn').value || "Option Button Label", CONFIG.button.x, CONFIG.button.y);
     }
 
-    // 日本語対応の自動改行関数
+    // 1文字判定の日本語対応自動改行
     function wrapText(text, x, y, maxWidth, lineHeight) {
         text.split('\n').forEach(p => {
             let line = '';
@@ -140,12 +163,12 @@
         });
     }
 
-    // リアルタイム反映
+    // 全入力にリアルタイム反映を適用
     ['ttl','txt','btn','zoom'].forEach(id => {
         document.getElementById(id).oninput = render;
     });
 
-    // ドラッグ移動
+    // マウスドラッグ移動
     cv.onmousedown = e => {
         drag = true;
         const r = cv.getBoundingClientRect(), s = cv.width/r.width;
@@ -160,10 +183,10 @@
     };
     window.onmouseup = () => drag = false;
 
-    // 保存
+    // 画像エクスポート
     document.getElementById('saveBtn').onclick = () => {
         const link = document.createElement('a');
-        link.download = 'hoi4_news.png';
+        link.download = 'hoi4_news_event.png';
         link.href = cv.toDataURL("image/png");
         link.click();
     };
