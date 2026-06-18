@@ -2,23 +2,22 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoI4 News Generator - Perfect Layout</title>
+    <title>HoI4 News Generator - Final Fixed</title>
     <style>
         :root { --gold: #d4af37; --bg: #000; --panel: #1e1e1e; }
         body { background: var(--bg); color: #eee; font-family: "Hiragino Mincho ProN", serif; display: flex; padding: 20px; gap: 30px; justify-content: center; margin: 0; }
         .sidebar { width: 360px; background: var(--panel); padding: 25px; border-radius: 12px; border: 1px solid #333; height: fit-content; box-shadow: 0 10px 30px #000; }
-        h1 { color: var(--gold); font-size: 20px; text-align: center; margin: 0 0 20px; text-transform: uppercase; letter-spacing: 2px; }
+        h1 { color: var(--gold); font-size: 20px; text-align: center; margin: 0 0 20px; text-transform: uppercase; }
         .group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: bold; color: var(--gold); }
         input[type="text"], textarea, input[type="file"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; box-sizing: border-box; }
-        textarea { height: 120px; resize: none; font-family: serif; font-size: 16px; }
+        textarea { height: 120px; resize: none; font-size: 14px; }
         .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; }
         input[type="range"] { flex: 1; accent-color: var(--gold); }
         button#saveBtn { width: 100%; padding: 15px; background: #45a049; color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         button#saveBtn:hover { background: #52be57; }
-        .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; box-shadow: 0 0 50px #000; }
+        .viewport { background: #000; padding: 10px; border-radius: 8px; position: sticky; top: 20px; }
         canvas { display: block; max-height: 90vh; max-width: 100%; cursor: move; }
-        .hint { font-size: 11px; color: #777; text-align: center; margin-top: 10px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -32,18 +31,17 @@
         </div>
         <div class="group">
             <label>2. EVENT TITLE</label>
-            <input type="text" id="ttl" placeholder="The Rhineland Remilitarized">
+            <input type="text" id="ttl" placeholder="Title here">
         </div>
         <div class="group">
             <label>3. DESCRIPTION CONTENT</label>
-            <textarea id="txt" placeholder="German troops have entered the Rhineland..."></textarea>
+            <textarea id="txt" placeholder="Description here"></textarea>
         </div>
         <div class="group">
             <label>4. OPTION LABEL</label>
-            <input type="text" id="btn" placeholder="This is German territory.">
+            <input type="text" id="btn" placeholder="Button text">
         </div>
         <button id="saveBtn">EXPORT AS PNG</button>
-        <p class="hint">Drag the photo in the preview to move it.</p>
     </div>
 
     <div class="viewport">
@@ -76,75 +74,67 @@
 
     function render() {
         if (!bg.complete) return;
-        
-        // 描画の初期化
         ctx.clearRect(0, 0, cv.width, cv.height);
-
-        // 新聞の外にはみ出さないように、背景を黒で塗りつぶしておく
-        ctx.fillStyle = "black";
-        ctx.fillRect(0, 0, cv.width, cv.height);
 
         const scale = parseFloat(document.getElementById('zoom').value);
 
-        // --- STEP 1: 写真を描画 ---
+        // --- STEP 1: はみ出しを「新聞のサイズ」で完全にカットする ---
+        ctx.save();
+        ctx.beginPath();
+        // 新聞画像の大きさ(961x1102等)にクリッピングパスを作成
+        ctx.rect(0, 0, cv.width, cv.height);
+        ctx.clip(); // これ以降の描画は新聞の範囲内だけに制限される
+
+        // 写真を背面描画
         if (photo.src && photo.complete) {
             const pw = photo.width * scale, ph = photo.height * scale;
             ctx.drawImage(photo, pos.x - pw/2, pos.y - ph/2, pw, ph);
         } else {
-            ctx.fillStyle = "#111"; // 写真がない時の穴あき部分
+            ctx.fillStyle = "#111";
             ctx.fillRect(107, 141, 755, 272);
         }
+        ctx.restore(); // 制限を解除（文字や新聞本体を描くため）
 
         // --- STEP 2: 背景（新聞枠）を上に重ねる ---
-        // 新聞画像が透明に切り抜かれているため、写真が穴から覗く形になります
         ctx.drawImage(bg, 0, 0);
 
-        // --- STEP 3: 文字を描画 (ご指定いただいた座標とスタイル) ---
+        // --- STEP 3: 文字描画（指定の座標とサイズ） ---
         
-        // タイトル: y=280
+        // タイトル: y=280 / 21px
         ctx.fillStyle = "#2c2c2c";
         ctx.textAlign = "center"; 
         ctx.font = "bold 21px serif";
         ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 280);
 
-        // 本文: y=305 / 13px / maxWidth 440 / lineHeight 15
+        // 本文: x=50, y=305 / 13px / maxWidth 440 / lineHeight 15
         ctx.textAlign = "left"; 
         ctx.font = "13px serif";
         wrapText(document.getElementById('txt').value || "Description text here...", 50, 305, 440, 15);
 
-        // ボタン: y=535 / 白文字 / 19px
+        // ボタン: y=535 / 19px / 白文字
         ctx.textAlign = "center"; 
         ctx.font = "bold 19px serif";
         ctx.fillStyle = "white";
         ctx.fillText(document.getElementById('btn').value || "Option Button", cv.width/2, 535);
     }
 
-    // 自動改行関数 (日本語対応)
     function wrapText(text, x, y, maxWidth, lineHeight) {
-        text.split('\n').forEach(paragraph => {
+        text.split('\n').forEach(p => {
             let line = '';
-            const characters = paragraph.split('');
-            for (let n = 0; n < characters.length; n++) {
-                let testLine = line + characters[n];
-                if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+            const chars = p.split('');
+            for(let i=0; i<chars.length; i++) {
+                let test = line + chars[i];
+                if (ctx.measureText(test).width > maxWidth) {
                     ctx.fillText(line, x, y);
-                    line = characters[n];
-                    y += lineHeight;
-                } else {
-                    line = testLine;
-                }
+                    line = chars[i]; y += lineHeight;
+                } else { line = test; }
             }
-            ctx.fillText(line, x, y);
-            y += lineHeight;
+            ctx.fillText(line, x, y); y += lineHeight;
         });
     }
 
-    // 入力項目変更時に即座に再描画
-    ['ttl','txt','btn','zoom'].forEach(id => {
-        document.getElementById(id).oninput = render;
-    });
+    ['ttl','txt','btn','zoom'].forEach(id => document.getElementById(id).oninput = render);
 
-    // 写真の移動操作
     cv.onmousedown = e => {
         drag = true; 
         const r = cv.getBoundingClientRect(), s = cv.width/r.width;
@@ -160,7 +150,6 @@
     };
     window.onmouseup = () => drag = false;
 
-    // 保存ボタン
     document.getElementById('saveBtn').onclick = () => {
         const link = document.createElement('a'); 
         link.download = 'hoi4_news.png';
