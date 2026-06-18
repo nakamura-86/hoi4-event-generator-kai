@@ -111,12 +111,12 @@
         // タイトル: y=430（実機の位置に準拠）
         ctx.textAlign = "center";
         ctx.font = "bold 32px serif";
-        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 320);
+        ctx.fillText(document.getElementById('ttl').value || "EVENT TITLE", cv.width/2, 280);
 
         // 本文: y=475 から開始
         ctx.textAlign = "left";
-        ctx.font = "20px serif";
-        wrapText(document.getElementById('txt').value || "Description text here...", 55, 305, 340, 26);
+        ctx.font = "18px serif";
+        wrapText(document.getElementById('txt').value || "Description text here...", 55, 305, 400, 26);
 
         // ボタン: y=885（プレート中央）
         ctx.textAlign = "center";
